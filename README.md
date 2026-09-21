@@ -2,7 +2,7 @@
 
 `xiaowei-video-pipeline` 是一个面向 Codex、Claude Code 和通用 Agent 的视频后期 Skill 仓库。它把已录制或已剪辑的视频，整理成可复核、可恢复、可发布的成片交付包。
 
-仓库中的 Skill 内部名称是 `oil-video-pipeline`，这样可以和已有的 `oil-subtitle`、`oil-cover`、`oil-visual` 工作流保持兼容。
+仓库中的 Skill 内部名称是 `xiaowei-video-pipeline`，这样可以和已有的 `字幕工作流`、`封面工作流`、`视觉工作流` 工作流保持兼容。
 
 > Copyright © 2026 Xiaowei. All rights reserved. 本仓库保留全部权利，未授予复制、修改、再发布、商业使用或重新打包的许可。查看本仓库不等于获得授权。
 
@@ -197,7 +197,7 @@ Skill 只准备和核对平台草稿，不点击最终公开发布按钮。
 
 ```bash
 git clone https://github.com/siuserxiaowei/xiaowei-video-pipeline.git
-cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.codex/skills/
+cp -R xiaowei-video-pipeline/skills/xiaowei-video-pipeline ~/.codex/skills/
 ```
 
 安装后重新打开 Codex 或开启新任务，让它重新发现 Skill。
@@ -205,7 +205,7 @@ cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.codex/skills/
 ### Claude Code
 
 ```bash
-cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.claude/skills/
+cp -R xiaowei-video-pipeline/skills/xiaowei-video-pipeline ~/.claude/skills/
 ```
 
 ### 通用 Agent
@@ -213,7 +213,7 @@ cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.claude/skills/
 复制到对应的 Agent Skill 目录：
 
 ```bash
-cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.agents/skills/
+cp -R xiaowei-video-pipeline/skills/xiaowei-video-pipeline ~/.agents/skills/
 ```
 
 ## 使用示例
@@ -221,7 +221,7 @@ cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.agents/skills/
 ### 完整成片
 
 ```text
-使用 oil-video-pipeline，把 /absolute/path/demo.mp4 做成中文视频成片。
+使用 xiaowei-video-pipeline，把 /absolute/path/demo.mp4 做成中文视频成片。
 要求：烧录字幕、输出中文 SRT 和 ASS、生成 3:4/4:3/16:9 封面，目标平台是 YouTube 和小红书。
 先预览和质检，不要点击发布。
 ```
@@ -229,21 +229,21 @@ cp -R xiaowei-video-pipeline/skills/oil-video-pipeline ~/.agents/skills/
 ### 只做字幕
 
 ```text
-使用 oil-video-pipeline，只处理 /absolute/path/demo.mp4 的中文字幕。
+使用 xiaowei-video-pipeline，只处理 /absolute/path/demo.mp4 的中文字幕。
 输出 SRT、ASS 和烧录 MP4，不生成封面，不做平台上传。
 ```
 
 ### 屏幕录制校对
 
 ```text
-使用 oil-video-pipeline，校对这个屏幕录制里的产品名、命令和版本号。
+使用 xiaowei-video-pipeline，校对这个屏幕录制里的产品名、命令和版本号。
 所有改词必须保留音频或同时间画面证据，不确定的地方标记出来。
 ```
 
 ### 只准备平台交付包
 
 ```text
-使用 oil-video-pipeline，检查这个已经剪好的 MP4 是否符合 YouTube 和竖屏短视频 profile，
+使用 xiaowei-video-pipeline，检查这个已经剪好的 MP4 是否符合 YouTube 和竖屏短视频 profile，
 生成 delivery.json、quality.json 和需要修复的问题，不要重新剪辑和发布。
 ```
 
@@ -268,7 +268,7 @@ Skill 本身是说明文件，不单独收费，也不需要充值。使用时�
 ```text
 README.md
 skills/
-└── oil-video-pipeline/
+└── xiaowei-video-pipeline/
     ├── SKILL.md
     └── references/
         ├── artifact-manifest.md
@@ -279,8 +279,8 @@ skills/
 
 详细规则和案例入口：
 
-- [Skill 主说明](skills/oil-video-pipeline/SKILL.md)
-- [质量闸门](skills/oil-video-pipeline/references/quality-gates.md)
-- [交付清单格式](skills/oil-video-pipeline/references/artifact-manifest.md)
-- [使用案例](skills/oil-video-pipeline/references/examples.md)
-- [来源审计](skills/oil-video-pipeline/references/skill-lineage.md)
+- [Skill 主说明](skills/xiaowei-video-pipeline/SKILL.md)
+- [质量闸门](skills/xiaowei-video-pipeline/references/quality-gates.md)
+- [交付清单格式](skills/xiaowei-video-pipeline/references/artifact-manifest.md)
+- [使用案例](skills/xiaowei-video-pipeline/references/examples.md)
+- [来源审计](skills/xiaowei-video-pipeline/references/skill-lineage.md)
