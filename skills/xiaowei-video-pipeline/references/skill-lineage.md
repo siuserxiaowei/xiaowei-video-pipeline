@@ -81,3 +81,32 @@
 第三方 skill 的具体默认值、脚本和平台数值可能随时间改变；本地 Skill 只固定证据链和检查结构，具体工具参数与平台限制仍需在任务当天按官方文档复核。
 
 网络来源只用来提炼流程模式和检查边界；具体命令、版本、平台限制仍以当前本机工具和任务现场的验证结果为准。
+
+## 2026-10-07 公开 Skill 调研与吸收记录
+
+本轮对用户要求的 20 个媒体 Skill 做了功能对照。吸收的是可迁移的决策模式，不复制第三方代码、默认参数或文案；云端 API、NLE 私有实现和付费服务仍保持可选。
+
+| 来源 | 观察 | 纳入本 Skill 的做法 |
+|---|---|---|
+| [timelapsetech/mediaskills](https://github.com/timelapsetech/mediaskills) | probe、音频、OCR、Whisper、镜头、字幕和 QC 模块化 | `media_doctor.py`、能力快照、provider 缺口显式记录 |
+| [kajisho5/ffmpeg-skill](https://github.com/kajisho5/ffmpeg-skill) | typed tool、跨平台、probe→edit→check→verify | 统一阶段合同、结构化 JSON、显式 stream map 和验证 |
+| [muhammaddadu/ffmpeg-skill](https://github.com/muhammaddadu/ffmpeg-skill) | recipe/生产流水线 | 将目标体积、编码和回退写入参考合同，不照搬 preset |
+| [zircote/media-processing](https://github.com/zircote/.claude/tree/main/skills/media-processing) | 格式、硬件、HLS/DASH、OCR、批处理覆盖广 | 硬件 smoke test、输入/输出 manifest 和平台分支 |
+| [n0an/ffmpeg-skill](https://github.com/n0an/ffmpeg-skill) | 多 Agent 兼容、NVENC/QSV/VAAPI | 工具链与编码器能力记录，跨 Agent 只依赖文件合同 |
+| [6missedcalls/video-editing-skill](https://github.com/6missedcalls/video-editing-skill) | 讲话视频自然语言粗剪、Whisper | 可选智能粗剪分支，保留语义单元和证据 |
+| [vincentventalon/claude-code-video-editing-skill](https://github.com/vincentventalon/claude-code-video-editing-skill) | 停顿、口误、重录处理 | `conservative/balanced/aggressive` 模式与人工复核 |
+| [agamm/video-agent](https://github.com/agamm/video-agent) | 本地转写、镜头/场景、剪辑清单并重新观看 | transcript + scene/audio/frame evidence，预览后渲染 |
+| [imjszhang/js-video-edit-skill](https://github.com/imjszhang/js-video-edit-skill) | ASR→JSON 决策→FFmpeg/Remotion | `edit-plan.json` 作为唯一可交换中间层 |
+| [officialwhitebird/video-automation-skill](https://github.com/officialwhitebird/video-automation-skill) | 预览优先、字幕审阅、平台预设 | preview-save、profile 版本和平台独立验证 |
+| [notque/vexjoy-agent](https://github.com/notque/vexjoy-agent) | AI EDL→FFmpeg→Remotion 分层 | cut list、EDL/FCPXML 可选输出，不直接改 NLE |
+| [Kemerd/premiere-agent](https://github.com/Kemerd/premiere-agent) | Parakeet/Florence/CLAP 与 FCPXML/NLE 交付 | 可选 NLE interchange，保留源媒体引用和时间码真相 |
+| [Starchild video-analysis](https://github.com/Starchild-ai-agent/official-skills/tree/main/video-analysis) | 视频分析与镜头理解 | evidence bundle 与低置信度 rewatch |
+| [Remotion 官方 Skills](https://github.com/remotion-dev/skills) | Caption 数据、still、lint、render | `probe→plan→preview→lint→render→verify→rewatch` |
+| [haidrrrry/claude-remotion-skill](https://github.com/haidrrrry/claude-remotion-skill) | 动效、B-roll、字幕、转场和渲染复查 | Remotion 保持独立分支，不污染本地 FFmpeg 默认路径 |
+| [notivn/AIEV](https://github.com/notivn/AIEV) | 自托管视频工作台和多阶段 QC | 阶段状态、收据、失败恢复和本地优先 |
+| [Vincentwei1021/video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) | 产品宣传片配方和预览工作台 | cue plan、spec review、contact sheet，未吸收其品牌资产 |
+| [Bomx/super-video-maker-skill](https://github.com/Bomx/super-video-maker-skill) | 多 API 端到端生成 | 只采纳模块化路由；第三方 API、付费和生成式依赖不设为默认 |
+| [blazerior/videoediting-claude-skill](https://github.com/blazerior/videoediting-claude-skill) | 通用编辑工作流 | 与本地工具能力快照结合，不新增覆盖式命令 |
+| [story-video-skill](https://clawhub.ai/yhongm/skills/story-video-skill) | 故事型视频流程 | 作为内容生产分支参考，保持事实证据和人工确认边界 |
+
+未吸收的共同问题：默认 `-y` 覆盖、未验证的 GPU 推断、只看 FFmpeg 退出码、把云 API 当必需依赖、把预览或渲染成功直接当交付成功。这些风险在本 Skill 的能力合同、不可覆盖规则和最终 `verification.json` 中明确拦截。

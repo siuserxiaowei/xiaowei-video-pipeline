@@ -42,6 +42,19 @@
 | 最终导出音频没有削波，声音在音乐下仍可懂 | error | 试听与测量 |
 | 启用 YouTube profile 时验证 fast start、codec、48 kHz、帧率、逐行和 BT.709 | error | ffprobe/format check |
 
+## 能力与智能粗剪
+
+| 检查 | 级别 | 证据 |
+|---|---|---|
+| `capabilities.json` 记录 FFmpeg/ffprobe 版本、滤镜、编码器、ASR/OCR、字体和磁盘 | error | media doctor 输出 |
+| 计划使用的编码器经过当前机器短片 smoke test | error | operation log |
+| `edit-plan.json` schema、时间排序、时长边界和 keep/cut 决策通过校验 | error | validate_edit_plan 输出 |
+| 每个 cut 和重要 keep 有 transcript/audio/frame/scene/用户指令证据 | error | edit-plan evidence |
+| 粗剪没有跨说话人、retake 或不连续语义拼接 | error | contact sheet、edit-report |
+| preview 与最终 render 的 timelineHash、profileHash 和输出参数一致 | error | preview-save、verification |
+| 目标体积两遍编码使用同一个绝对 passlogfile，失败临时文件已清理 | error | operation log |
+| 缺失滤镜或 provider 的回退路径写入 quality.json | warning | capabilities/quality |
+
 ## 封面
 
 | 检查 | 级别 | 证据 |

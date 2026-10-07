@@ -1,21 +1,21 @@
 ---
 name: xiaowei-video-pipeline
 description: >
-  把已录制或已剪辑的视频整理成可发布的成片包：锁定源文件，转录并按音频证据校对字幕，生成 SRT/ASS 和烧录视频，制作多画幅封面，执行结构与视觉质检，并输出可恢复的交付清单。用户要求完整视频后期、字幕加封面、发布前检查、成片打包，或明确提到 xiaowei-video-pipeline 时使用；只做字幕时优先使用 字幕工作流。
+  把本地视频或已授权下载的媒体整理成可发布的成片包：锁定源文件，探测能力，按需转录、智能粗剪、校对字幕，生成 SRT/ASS 和烧录视频，制作多画幅封面，执行结构与视觉质检，并输出可恢复的交付清单。用户要求完整视频后期、字幕加封面、智能粗剪、发布前检查、成片打包，或明确提到 xiaowei-video-pipeline 时使用；只做字幕时优先使用字幕工作流。
 ---
 
-# Oil Video Pipeline
+# Xiaowei Video Pipeline
 
 将视频后期拆成可恢复的阶段。每个阶段只读取已经确认的产物，写入新的产物和状态，不用“重新跑一遍”解决局部问题。涉及 ChatCut、Remotion 或平台发布时，先读取本 Skill 对应的分支参考，不把一个工具的成功返回当成最终交付证据。
 
 ## 适用范围
 
-- 输入是已经录制或剪辑完成的本地视频，目标是得到字幕成片、字幕文件、封面和发布资料。
+- 输入优先是已经录制或剪辑完成的本地视频；用户明确要求且来源有授权时，也可以先通过独立 ingest 分支下载媒体。目标是得到字幕成片、字幕文件、封面和发布资料。
 - 处理可以包含：转录、全文校对、字幕排版与烧录、3:4/4:3/16:9 封面、平台规格检查和交付清单。
-- 不修改 Screen Studio、Premiere、Final Cut 或 Remotion 工程的时间线；需要改剪辑时先交回剪辑工作流。
+- 需要改剪辑时可以启用本 Skill 的智能粗剪分支，输出可复核的 cut list、预览和可选 EDL/FCPXML/Resolve XML；不直接修改 Screen Studio、Premiere、Final Cut 或 Remotion 工程的时间线。
 - 不替用户点击最终发布按钮。发布阶段只准备并核对草稿，保留人工确认点。
 
-单独的字幕任务直接转用 `字幕工作流`；只有生成式视频、Remotion 组件或 TTS 工程时，转用 `remotion-video` / `video-creator`。本 Skill 负责把这些环节串成一条有证据的交付路径。路由优先：用户只要字幕就走字幕分支，只要封面就走封面分支，只有明确要求完整成片才执行全流程。
+单独的字幕任务直接转用 `字幕工作流`；只有生成式视频、Remotion 组件或 TTS 工程时，转用 `remotion-video` / `video-creator`。需要下载时先走授权的 ingest 分支；需要自动找高光、去停顿或去重录时才启用智能粗剪。本 Skill 负责把这些环节串成一条有证据的交付路径。路由优先：用户只要字幕就走字幕分支，只要封面就走封面分支，只有明确要求完整成片才执行全流程。
 
 ## 核心原则
 
@@ -34,6 +34,10 @@ description: >
 13. **交付是版本化资产包**：每次导出都使用独立的 `exports/<id>/`，记录平台 profile 版本、字幕 profile、音频测量、素材授权备注和 edit report；输入文件和既有定稿不可覆盖。
 14. **字幕先分 profile**：先决定是普通字幕（只传递对白）、无障碍 captions（还要表达关键音效和说话人）还是社交平台烧录字幕；不要把一个断句、样式和行长规则套到全部场景。
 15. **自动转录必须人工抽样**：ASR 可能漏掉否定词、混淆说话人、专有名词和背景声音。至少抽查开头、中段、结尾及所有低置信度 cue；无法确认的词保留疑点，不凭常识补写。
+16. **统一阶段合同**：有剪辑决策时遵循 `probe → plan → preview → lint → render → verify → rewatch`；自然语言判断必须先落到结构化计划，再生成命令或时间线。
+17. **时间线独立指纹**：源文件、转录、剪辑计划、字幕、平台 profile 和工具链各自记录 hash；时间线变化会使下游字幕、封面和导出验证失效。
+18. **硬件能力必须实测**：编码器出现在 FFmpeg 列表里不等于当前机器可用；先用短片 smoke test，失败才回退 CPU 编码，并把实际编码器写入报告。
+19. **回退必须显式**：缺少字幕滤镜、ASR、OCR、GPU 或下载器时，切换到已记录的替代路径或阻塞，不静默伪造“已完成”。
 
 ## 任务目录与状态
 
@@ -43,28 +47,34 @@ description: >
 <视频名>.oil-video-task/
 ├── task.json                 # 阶段、源指纹、选项和版本
 ├── source.json               # 输入文件证据
+├── capabilities.json         # FFmpeg/ASR/OCR/字体/磁盘/编码器能力快照
+├── media-manifest.json       # 输入、下载收据、素材来源和授权备注
 ├── transcript.json           # 原始或导入转录
 ├── reviewed-transcript.json  # Agent 校对稿，只改 text
 ├── review-evidence.json      # 每处改词的音频/画面证据
+├── edit-plan.json            # 可复核的 keep/cut 粗剪计划（按需）
+├── edit-report.md            # 每个切点、证据、风险和输出参数
 ├── captions.json             # 结构化字幕，毫秒时间轴
 ├── preview-save.json         # 当前预览会话的保存凭据
 ├── quality.json              # 自动检查结果和人工检查清单
+├── verification.json         # 最终文件的结构、画面、音频和指纹检查
+├── evidence/                 # 抽帧、OCR、音频窗口和 contact sheet
 ├── cover/                    # 参考帧、方案、prompt、各画幅成品
 ├── exports/<id>/              # 每次独立导出及 verification.json
 └── delivery.json             # 最终交付清单和指纹
 ```
 
-状态至少区分 `created`、`transcribing`、`awaiting_agent_review`、`awaiting_user_review`、`approved`、`exported`、`blocked`。状态变化必须和实际文件一起原子写入；恢复时先读取状态，再检查文件指纹。
+状态至少区分 `created`、`planning`、`transcribing`、`awaiting_agent_review`、`awaiting_user_review`、`approved`、`rendering`、`exported`、`blocked`。状态变化必须和实际文件一起原子写入；恢复时先读取状态，再检查文件指纹。
 
 ## 工作流
 
 ### 1. 接收与预检
 
-先列出视频旁已有的 `.srt`、`.ass`、文稿、封面和旧任务，核对它们是否与当前视频同源。运行 `字幕工作流` 的 `doctor` 或等价的本地检查，确认 FFmpeg、字幕烧录能力、视频轨道、音轨和可用磁盘空间。
+先列出视频旁已有的 `.srt`、`.ass`、文稿、封面和旧任务，核对它们是否与当前视频同源。运行随包的 `scripts/media_doctor.py` 或等价的本地检查，确认 FFmpeg/ffprobe、字幕滤镜、视频轨道、音轨、转录/OCR provider、字体、编码器和可用磁盘空间。
 
 把预检结果写入 `task.json` 的 `capabilities`：每项使用 `available`、`missing` 或 `unknown`，同时记录检测命令、版本和检测时间。屏幕录制或需要校对画面文字时，建立 `evidence/`，保存章节起止帧、OCR 文本和观察备注；证据不足时降低自动修正权限。
 
-记录用户选项：语言、是否烧录、是否显示章节进度、是否美颜、封面画幅、是否需要英文 SRT、目标平台、目标时长、画幅、节奏/语气、要启用的处理类型和是否已明确免预览。没有明确授权时默认保留预览和人工确认。若多个关键选项缺失，集中询问一次，不在后续阶段反复追问。
+记录用户选项：语言、是否烧录、是否显示章节进度、是否美颜、封面画幅、是否需要英文 SRT、目标平台、目标时长、画幅、节奏/语气、要启用的处理类型、来源是否允许下载和是否已明确免预览。没有明确授权时默认保留预览和人工确认。若多个关键选项缺失，集中询问一次，不在后续阶段反复追问。
 
 如果任务包含多个处理类型，先按“口播时间线 → 音频平滑 → MG/B-roll → 音乐/配音 → 字幕 → 导出”的依赖顺序执行；每个主要阶段完成后暂停给用户检查，除非用户明确要求端到端连续执行。
 
@@ -76,7 +86,19 @@ description: >
 - 为 Remotion 或其他程序化渲染准备字幕时，内部统一使用 `Caption` 结构：`text`、`startMs`、`endMs`、`timestampMs`、`confidence`。SRT/ASS 只是导入导出格式。
 - 使用 ChatCut 时先 `browse_assets`，不要重复导入；使用本地媒体导入器，不自行重写上传协议。转录就绪前不读取字幕，不把局部 transcript 片段当完整源稿。
 
-### 3. 全文校对与证据记录
+### 3. 智能粗剪与编辑计划（按需）
+
+用户要求去停顿、去口头禅、去重录、找高光、找特定人物/场景或输出剪辑清单时，读取 [references/smart-rough-cut.md](references/smart-rough-cut.md)。先把 transcript、静音窗口、镜头/场景索引、OCR 或目标检测结果组合成 `edit-plan.json`，再生成低码率 preview 和 contact sheet；不要把模型的一次判断直接变成最终剪辑。
+
+默认使用 `balanced` 模式；`conservative` 保留更多上下文，`aggressive` 只在用户明确选择短视频快剪时使用。每个 `cut` 和重要 `keep` 必须有时间码、原因、置信度和证据引用，计划生成后运行：
+
+```bash
+python3 scripts/validate_edit_plan.py /absolute/path/edit-plan.json
+```
+
+用户保存预览或明确免预览后，才把计划转换为 FFmpeg、EDL、FCPXML 或 Resolve XML。输出的交换文件只引用源媒体和时间码，不修改任何 NLE 工程。粗剪后的时间线要生成新的 `timelineHash`，下游字幕、封面和发布包按新 hash 复核。
+
+### 4. 全文校对与证据记录
 
 通读所有 segment，不只处理候选疑点。只改 `reviewed-transcript.json` 中的 `text`，保留时间码、词级 token、置信度和条目顺序。每处改词用零基索引记录原因和证据位置，例如：
 
@@ -88,7 +110,7 @@ description: >
 
 如果任务同时要求剪口播，按完整语义单元编辑：保留主语、连接词、转折和必要上下文，不拼接不同 retake 的残片；不确定时保守保留。定稿后运行一次音频平滑处理，再让下游字幕和画面层读取新的时间线。
 
-### 4. 字幕准备、预览与确认
+### 5. 字幕准备、预览与确认
 
 使用 `字幕工作流` 准备断句、中文与英文/数字边界空格和章节。字幕排版保持一个稳定的安全区域：底部居中、字号按画面高度计算、黑色描边和轻阴影，避免遮住人脸、界面关键区域和平台水印。长视频的章节进度是独立开关，用户关闭时准备和烧录都传同一个关闭选项。
 
@@ -98,13 +120,13 @@ description: >
 
 没有用户明确免预览授权时，启动预览并等待当前页面的保存证据。保存后检查 `manual-edit-review.json`：只有稳定且上下文安全的 ASR 错词映射才进入个人 glossary，润色、标点、删除和一次性改写不学习。确认后的任何文字变化都会使确认失效。
 
-### 5. 导出字幕成片
+### 6. 导出字幕成片
 
 先根据交付目的选择输出：字幕必须一直显示时交付烧录 MP4；需要开关、编辑或多语言轨道时交付软字幕容器；剪辑器或平台只需要字幕文件时交付 SRT/VTT，样式和位置有要求时再交付 ASS。保留原始转录、词级时间戳和显示用字幕，不只保留最后一份 SRT。
 
 先生成 SRT 草稿供快速检查，再以确认稿一次完成 ASS 和烧录。已有 MP4、SRT 或 ASS 默认不覆盖，使用带编号或时间戳的新导出目录。英文 SRT 从审校后的中文源逐条翻译，保持块数、编号、时间码和顺序不变；只要英文字幕文件时停止在 SRT，不生成烧录视频。
 
-若使用 ChatCut 导出，先从项目状态确认目标 timeline、范围、分辨率、codec 和格式，记录 renderId，用导出专用状态跟踪等待完成；排队中或运行中的 render 不能算交付。若使用 FFmpeg，先用 ffprobe 检查容器、编码、帧率、分辨率、音频和时长；能 stream copy 就不重复编码，不同时设置 CRF 和 bitrate，并显式 map 需要保留的流。
+若使用 ChatCut 导出，先从项目状态确认目标 timeline、范围、分辨率、codec 和格式，记录 renderId，用导出专用状态跟踪等待完成；排队中或运行中的 render 不能算交付。若使用 FFmpeg，先用 ffprobe 检查容器、编码、帧率、分辨率、音频和时长；能 stream copy 就不重复编码，不同时设置 CRF 和 bitrate，并显式 map 需要保留的流。目标体积两遍编码必须让两遍共享同一个绝对 `passlogfile`，并在失败时清理临时日志；不要把“命令退出 0”当成最终成功。
 
 若使用 HyperFrames 或同类 HTML 视频引擎，固定执行 `init → preview → lint → render → verify`；预览关键节拍、修完 lint 错误后才渲染。渲染前再做一次输出格式确认，渲染后用 ffprobe 和抽帧 contact sheet 验证，并写入 `edit-report.md`。
 
@@ -112,7 +134,7 @@ description: >
 
 如果任务启用音频质检，输出 `audio-measurement.json`，至少记录采样率、integrated loudness、loudness range 和 maximum true peak。根据目标平台选择响度 profile；广播型 EBU profile 可使用 -23 LUFS 目标，社交平台不要未经选择就强行套用这个值。FFmpeg `loudnorm` 的测量或双遍处理结果必须和最终导出文件绑定。
 
-### 6. 封面与画幅变体
+### 7. 封面与画幅变体
 
 从当前视频或字幕中提炼一个明确主标题和必要副标题，再运行 `封面工作流` 或等价的封面流程。先用本地清晰度和内容度筛选真实视频帧，再按语义选择参考帧；不要用历史任务里的品牌、颜色、Logo 或文案。
 
@@ -122,7 +144,7 @@ description: >
 
 若新增背景音乐，先区分纯音乐与带人声歌曲；未说明时不能擅自选择。音乐生成后再做剪辑、循环、淡入淡出和 ducking，不能承诺模型自动完成精确节拍同步。旁白或 TTS 必须先从当前语言和可用音色目录选择具体音色；现有录音只是字幕识别错时修正文稿，不要用合成语音替换正确的原声。
 
-### 7. 发布包与平台检查
+### 8. 发布包与平台检查
 
 建立平台矩阵和资产清单，至少记录每个平台使用的视频、画幅、标题、简介、话题/标签、原创声明、封面文件 SHA-256、B-roll/音乐来源和授权备注。复用 `video-publisher` 的 inspect/verify 思路：先检查现有草稿和持久 receipt，按指纹复用同源状态；只修复缺失或失效字段，不重复上传或覆盖正确草稿。
 
@@ -134,7 +156,7 @@ description: >
 
 不要点击最终发布按钮。交付时明确列出“已准备、已验证、待用户确认”三类状态。
 
-### 8. 交付与复核
+### 9. 交付与复核
 
 最终交付至少包含：字幕成片 MP4、中文 SRT、ASS（若生成）、英文 SRT（若请求）、三画幅封面、任务目录、`quality.json`、`verification.json` 和 `delivery.json`。Remotion 项目另保留最终 render 命令、composition、渲染日志和必要的 still 预览。交付前再核对路径、文件存在性、文件可读性和 SHA-256；任何未完成检查写明原因与最小补验方法。
 
@@ -142,7 +164,7 @@ description: >
 
 ## 统一质量闸门
 
-详细检查项和严重级别见 [references/quality-gates.md](references/quality-gates.md)。以下情况直接阻止交付：
+详细检查项和严重级别见 [references/quality-gates.md](references/quality-gates.md)。媒体能力快照和智能粗剪合同见 [references/capability-contract.md](references/capability-contract.md) 与 [references/smart-rough-cut.md](references/smart-rough-cut.md)。以下情况直接阻止交付：
 
 - 源文件指纹变化、输入来源不明或输出覆盖了用户已有定稿；
 - 字幕存在时间倒序、空文本、重叠、超时或无法播放；
@@ -150,6 +172,8 @@ description: >
 - 改词没有可追溯的音频/画面证据；
 - 封面出现当前素材之外的品牌、人物、Logo、数字或文案；
 - 平台草稿身份、封面 receipt 或字幕成片指纹无法核对；
+- `edit-plan.json` 无法通过结构检查，或 cut/keep 决策没有证据引用；
+- 计划使用的编码器、字幕滤镜、ASR/OCR provider 未在当前能力快照中验证；
 - 最终发布动作已经被自动化点击，或无法确认发布闸门仍然关闭。
 
 启用相应 profile 时，以下也直接阻止交付：平台 profile 版本和检查日期缺失；最终文件的音频测量缺失；YouTube profile 未验证 fast start/codec/帧率/色彩；或 evidence bundle 与最终时间线指纹不一致。
@@ -159,6 +183,8 @@ description: >
 ## 交付清单格式
 
 `delivery.json` 的字段约定见 [references/artifact-manifest.md](references/artifact-manifest.md)。回复用户时先给最终文件路径，再给验证结果、未完成项和需要用户确认的动作；不要只说“已完成”。
+
+使用方式、正向案例、边界案例和失败恢复见 [references/examples.md](references/examples.md)。
 
 本 Skill 的来源审计和取舍见 [references/skill-lineage.md](references/skill-lineage.md)。它区分通用视频实践、ChatCut/Remotion 分支规则和 Xiaowei 个人品牌规则，避免把特定工具的限制误套到所有视频任务。
 
@@ -171,6 +197,7 @@ description: >
 - `video-creator`：需要从脚本生成完整视频时，遵守时长总和、比例和固定字幕规范。
 - `video-publisher`：需要进入平台草稿时，使用平台 receipt、锁、断点和 final guard；本 Skill 不替它点击发布。
 - `ffmpeg` / `ffmpeg-usage`：媒体探测、stream mapping、编码选择、字幕处理和平台兼容性检查。
+- 随包 `scripts/media_doctor.py` / `scripts/validate_edit_plan.py`：能力快照和可交换粗剪计划的确定性检查；没有依赖时返回结构化缺口，不静默安装或覆盖文件。
 - `chatcut:asset-import` / `chatcut:export` / `chatcut:talking-head-guide` / `chatcut:music` / `chatcut:voice` / `chatcut:verification`：仅在使用对应 ChatCut 主机时加载，遵守其上传、时间线依赖、导出跟踪、配乐/配音和视觉验证边界。
 - `remotion:remotion-best-practices` / `remotion:remotion-render` / `remotion:remotion-multimedia`：仅在使用 Remotion 时加载对应 reference，不把旧版通用示例当当前 API。
 - `verification-before-completion`：任何完成声明之前刷新并读取验证证据。

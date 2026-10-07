@@ -73,3 +73,39 @@ delivery.json 用来让下一次发布或修订复用已经验证的产物。它
 - pass_with_warnings 必须列出警告；没有人工抽样证据时不能写 pass。
 - 平台草稿状态只代表字段和 receipt 已独立核对，不代表已经公开发布。
 - 修订成片时创建新的 exports/<id>/ 和新的清单；不要在旧清单里追加编辑历史。
+
+## 粗剪与工具链字段
+
+启用智能粗剪或多次导出时，在 `delivery.json` 中补充这些字段；它们用于断点恢复和判断旧产物是否还能复用：
+
+```json
+{
+  "timeline": {
+    "schema": 1,
+    "sourceSha256": "...",
+    "timelineHash": "...",
+    "editPlan": "/absolute/path/edit-plan.json",
+    "segments": 12,
+    "durationSeconds": 148.6
+  },
+  "toolchain": {
+    "ffmpegVersion": "...",
+    "ffprobeVersion": "...",
+    "encoder": "libx264",
+    "capabilitiesRef": "/absolute/path/capabilities.json"
+  },
+  "operations": [
+    {
+      "operationId": "op-20261007-001",
+      "stage": "render",
+      "status": "succeeded",
+      "commandDigest": "...",
+      "inputHash": "...",
+      "outputHash": "...",
+      "failure": null
+    }
+  ]
+}
+```
+
+`timelineHash` 必须由源文件 hash、按时间排序的 segment、决策、字幕时间轴和相关 profile 共同计算。只改输出文件名不创建新 timeline；改变任一时间线输入就不能复用旧的字幕烧录、封面或验证结论。`operations[].status` 只能使用 `planned`、`running`、`succeeded`、`failed`、`blocked` 或 `needs_user_review`；失败要保留可读的 `failure.code`、阶段和是否可重试。
